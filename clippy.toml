@@ -1,0 +1,4 @@
+# unwrap/expect are denied in production code (workspace lints);
+# in #[cfg(test)] they are the assertion mechanism.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true

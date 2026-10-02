@@ -1,0 +1,27 @@
+# Host workspace. The EVerest module (`module/RsGreenUpEvse`) links the
+# everestrs/C++ framework and is built only inside the EVerest Docker build,
+# so it is not a member here; every member builds and tests on macOS with
+# plain cargo (see docs/plan.md, "Repo").
+[workspace]
+resolver = "3"
+members = ["crates/legrand-proto"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+# everestrs is built with Rust 1.86 upstream (Bazel pin); stay compatible.
+rust-version = "1.86"
+license = "MIT OR Apache-2.0"
+authors = ["Wojtek Siudzinski"]
+repository = "https://github.com/evorada/everest-greenup"
+
+[workspace.dependencies]
+legrand-proto = { path = "crates/legrand-proto" }
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+missing_docs = "warn"

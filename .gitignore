@@ -1,0 +1,15 @@
+# Rust (target is a symlink to the external build disk)
+/target
+**/*.rs.bk
+
+# Board traces captured on site land in tests/traces/ and ARE committed;
+# raw greenup-link log dumps are not.
+logs/
+
+# macOS
+.DS_Store
+
+# Editors
+.idea/
+.vscode/
+*.swp

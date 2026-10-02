@@ -1,0 +1,36 @@
+[graph]
+all-features = true
+
+[advisories]
+version = 2
+yanked = "deny"
+
+[licenses]
+version = 2
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+]
+confidence-threshold = 0.93
+
+# serialport (greenup-runtime, the board's USB serial link) is MPL-2.0:
+# weak, file-scoped copyleft, and we use it unmodified. Scoped exception,
+# not a blanket allow.
+[[licenses.exceptions]]
+name = "serialport"
+allow = ["MPL-2.0"]
+
+[bans]
+multiple-versions = "warn"
+# Internal workspace crates are path deps with no version, which counts as
+# a "wildcard". Deny wildcards from crates.io, allow them for path deps.
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
