@@ -1,0 +1,23 @@
+# Build-spike config (docs/plan.md, "Prepare", step 3): exercises the everestrs
+# path end to end. Two Rust modules, one requirement between them, one C++ store.
+# Validated in the image build with `manager --check`.
+settings:
+  telemetry_enabled: false
+active_modules:
+  store:
+    module: Store
+  rs_example:
+    module: RsExample
+    connections:
+      their_store:
+        - module_id: store
+          implementation_id: main
+  rs_example_user:
+    module: RsExampleUser
+    connections:
+      their_example:
+        - module_id: rs_example
+          implementation_id: foobar
+      another_example:
+        - module_id: rs_example
+          implementation_id: foobar

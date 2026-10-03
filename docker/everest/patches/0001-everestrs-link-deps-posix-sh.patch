@@ -1,0 +1,21 @@
+everestrs: write the link-dependency file with printf, not `echo -e`
+
+Ninja runs custom commands through /bin/sh. On Debian and Ubuntu that is
+dash, whose `echo` has no `-e`: the file then starts with "-e " and
+everestrs' build.rs fails with "Cannot find library path '-e /…/libeverestrs_sys.a'".
+`printf "%s\n"` with COMMAND_EXPAND_LISTS writes one path per line in any
+POSIX shell and no longer needs the CMake 3.27 $<LIST:JOIN> expression.
+
+Upstream: EVerest/everest-core @ 4afd42e0, cmake/everest-generate.cmake.
+
+--- a/cmake/everest-generate.cmake
++++ b/cmake/everest-generate.cmake
+@@ -348,7 +348,7 @@
+         COMMAND_EXPAND_LISTS
+         VERBATIM
+         COMMAND
+-            echo -e $<LIST:JOIN,${RUST_LINK_DEPENDENCIES},\\n> > "${RUST_LINK_DEPENDENCIES_FILE}"
++            printf "%s\\n" ${RUST_LINK_DEPENDENCIES} > "${RUST_LINK_DEPENDENCIES_FILE}"
+     )
+ 
+     add_custom_target(generate_rust

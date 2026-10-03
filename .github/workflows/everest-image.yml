@@ -1,0 +1,81 @@
+name: EVerest image
+
+# Builds docker/everest/Dockerfile natively on arm64 (the Pi 3 target).
+#   - push to main / pull requests: the pinned EVerest SHA; pushes to GHCR on main.
+#   - weekly canary: EVerest `main`, to catch evse_manager/energy interface breaks early
+#     (docs/plan.md, "Deploy", step 10). Never pushed.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - docker/everest/**
+      - config/**
+      - module/**
+      - .github/workflows/everest-image.yml
+  pull_request:
+    paths:
+      - docker/everest/**
+      - config/**
+      - module/**
+      - .github/workflows/everest-image.yml
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+    inputs:
+      everest_ref:
+        description: EVerest git ref to build (empty = the pinned SHA in the Dockerfile)
+        required: false
+        default: ""
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  image:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 240
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pick the EVerest ref
+        id: ref
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            echo "everest_ref=main" >> "$GITHUB_OUTPUT"
+            echo "canary=true" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ github.event.inputs.everest_ref }}" ]; then
+            echo "everest_ref=${{ github.event.inputs.everest_ref }}" >> "$GITHUB_OUTPUT"
+            echo "canary=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "everest_ref=" >> "$GITHUB_OUTPUT"
+            echo "canary=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build (and push on main)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/everest/Dockerfile
+          platforms: linux/arm64
+          push: ${{ github.event_name == 'push' }}
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+          build-args: |
+            ${{ steps.ref.outputs.everest_ref != '' && format('EVEREST_REF={0}', steps.ref.outputs.everest_ref) || '' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
