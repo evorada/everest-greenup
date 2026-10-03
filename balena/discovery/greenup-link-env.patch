@@ -1,0 +1,53 @@
+diff --git a/src/main.rs b/src/main.rs
+index 07928d0..0eb041d 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -39,13 +39,13 @@ async fn main() {
+     // 2. Démarrer le serveur HTTP Axum
+     let router = api::build_router(app_state);
+     
+-    // On écoute sur toutes les interfaces réseau (0.0.0.0) sur le port 8080
+-    let addr = "0.0.0.0:8080";
++    // Patched (everest-greenup discovery): listen address from the environment.
++    let addr = std::env::var("GREENUP_HTTP_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".to_string());
+     logger::log("SYS", &format!("🌍 Serveur Web démarré : http://{}", addr));
+     logger::log("SYS", "   - GET  /api/info, /api/telemetry");
+     logger::log("SYS", "   - POST /api/charge/start, /api/charge/stop, /api/current/:amps");
+     logger::log("SYS", "   - POST /api/tic/refresh, /api/bluetooth");
+     
+-    let listener = tokio::net::TcpListener::bind(addr).await.expect("Impossible de lier le port 8080");
++    let listener = tokio::net::TcpListener::bind(&addr).await.expect("Impossible de lier l'adresse HTTP");
+     axum::serve(listener, router).await.expect("Erreur fatale du serveur web");
+ }
+diff --git a/src/serial.rs b/src/serial.rs
+index 2b58015..e07bbce 100644
+--- a/src/serial.rs
++++ b/src/serial.rs
+@@ -8,13 +8,14 @@ use tokio::sync::mpsc;
+ const TICTM_MAX_ZEROS: u32 = 5;
+ 
+ pub fn run_serial_loop(state: SharedState, mut rx: mpsc::Receiver<String>) {
+-    let port_name = "/dev/ttyUSB0";
++    // Patched (everest-greenup discovery): port from the environment.
++    let port_name = std::env::var("GREENUP_PORT").unwrap_or_else(|_| "/dev/ttyUSB0".to_string());
+     let baud_rate = 115200;
+ 
+     loop {
+         logger::log("SERIE", &format!("Tentative d'ouverture de {}...", port_name));
+         
+-        match serialport::new(port_name, baud_rate)
++        match serialport::new(port_name.as_str(), baud_rate)
+             .timeout(Duration::from_millis(50))
+             .open()
+         {
+@@ -160,7 +161,9 @@ fn parse_incoming_line(line: &str, state: &SharedState) {
+         }
+     } else if line.starts_with("FM:") {
+         let fm_val = line.replace("FM:", "");
+-        if fm_val != "1" {
++        // Patched (everest-greenup discovery): GREENUP_FORCE_FM=0 keeps the board's own FM value.
++        let force_fm = std::env::var("GREENUP_FORCE_FM").map_or(true, |v| v != "0");
++        if fm_val != "1" && force_fm {
+             logger::log("SERIE", &format!("⚠️ Mode FM détecté = {}, forçage en FM:1", fm_val));
+             let _ = state.serial_tx.try_send("FM:1\r".to_string());
+         }

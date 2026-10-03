@@ -22,10 +22,13 @@ hardware go/no-go gates and the phases.
 | Path | What |
 | --- | --- |
 | `crates/legrand-proto` | Board serial protocol: commands, messages, state letters, line framing. Pure, no I/O. |
+| `balena/discovery` | Balena discovery release: picocom + patched greenup-link, no EVerest. For the hardware gates. |
+| `docker/everest` | EVerest (pinned upstream SHA) built for arm64 with Rust module support, plus a slim runtime image. |
+| `config/` | EVerest configs installed into the image (`manager --check` runs on them at build time). |
 | `docs/plan.md` | Design and plan |
 
 Planned: `evse-session`, `legrand-driver`, `board-model`, `greenup-runtime`,
-`bins/legrand-sim`, `module/RsGreenUpEvse`, Docker and Balena packaging.
+`bins/legrand-sim`, `module/RsGreenUpEvse`, the Balena release with EVerest.
 
 ## Development
 
@@ -39,6 +42,13 @@ cargo fmt --all --check
 
 `target/` is a symlink to an external build disk on the main dev machine;
 recreate it as a plain directory elsewhere if needed.
+
+Images (arm64, built natively on Apple silicon):
+
+```sh
+docker build --platform linux/arm64 -t greenup-discovery balena/discovery
+docker build --platform linux/arm64 -f docker/everest/Dockerfile -t everest-greenup .
+```
 
 ## License
 
