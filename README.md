@@ -22,6 +22,7 @@ hardware go/no-go gates and the phases.
 | Path | What |
 | --- | --- |
 | `crates/legrand-proto` | Board serial protocol: commands, messages, state letters, line framing. Pure, no I/O. |
+| `crates/evse-session` | Session state machine (EvseManager's event grammar), energy node, the `ChargerDriver` contract. Pure. |
 | `balena/discovery` | Balena discovery release: picocom + patched greenup-link, no EVerest. For the hardware gates. |
 | `docker/everest` | EVerest (pinned upstream SHA) built for arm64 with Rust module support, plus a slim runtime image. |
 | `config/` | EVerest configs installed into the image (`manager --check` runs on them at build time). |

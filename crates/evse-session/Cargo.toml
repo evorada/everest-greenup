@@ -1,0 +1,18 @@
+[package]
+name = "evse-session"
+description = "Session state machine and energy component for a wallbox that runs its own charging logic (EVerest-agnostic, no I/O)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+proptest = "1"
+
+[lints]
+workspace = true

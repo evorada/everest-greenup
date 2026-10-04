@@ -4,7 +4,7 @@
 # plain cargo (see docs/plan.md, "Repo").
 [workspace]
 resolver = "3"
-members = ["crates/legrand-proto"]
+members = ["crates/legrand-proto", "crates/evse-session"]
 
 [workspace.package]
 version = "0.1.0"
@@ -17,6 +17,7 @@ repository = "https://github.com/evorada/everest-greenup"
 
 [workspace.dependencies]
 legrand-proto = { path = "crates/legrand-proto" }
+evse-session = { path = "crates/evse-session" }
 
 [workspace.lints.clippy]
 unwrap_used = "deny"
