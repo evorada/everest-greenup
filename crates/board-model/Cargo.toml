@@ -1,0 +1,17 @@
+[package]
+name = "board-model"
+description = "Fake Legrand Green'Up power board for tests and simulation, with one profile per open hardware question"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+
+[dev-dependencies]
+legrand-proto = { workspace = true }
+
+[lints]
+workspace = true
