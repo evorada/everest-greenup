@@ -43,13 +43,20 @@ Balena release (raspberrypi3-64), network_mode: host
   mosquitto (127.0.0.1:1883 only)
   everest = EVerest @ pin + RsGreenUpEvse built in-tree
      Auth ──────────┐
-     OCPP201 ───────┼──► RsGreenUpEvse.evse_1 / evse_2      (evse_manager)
+     OCPP201 ───────┼──► evse_1.evse / evse_2.evse              (evse_manager)
      API ───────────┘
-     EnergyNode(fuse) ─► RsGreenUpEvse.energy_1 / energy_2  (energy)
+     EnergyNode(fuse) ─► evse_1.energy_grid / evse_2.energy_grid (energy)
      EnergyManager ── energy_trunk ─► EnergyNode
-  RsGreenUpEvse: one instance, opens every configured port, binds each port to
-  side 1/2 using the board's `Side?` answer. No EvseManager, no BSP.
+  evse_1, evse_2: one RsGreenUpEvse instance per side, each on its own port
+  (config `port`, `side`). The driver checks the board's `Side?` answer
+  against `side` and raises Inoperative on a mismatch, so a swapped USB
+  enumeration is caught instead of silently crossing the sides. No
+  EvseManager, no BSP.
 ```
+
+Built on 2026-10-04: every crate in the table below, the module, the image
+build and the SIL config. Still open: the hardware gates, the differential
+test, OCPP.
 
 ### Repo `evorada/everest-greenup`
 ```
@@ -60,10 +67,11 @@ crates/evse-session      pure: per-connector session state machine, energy compo
 crates/legrand-driver    pure: ChargerDriver for the Legrand board (command scheduler,
                          sync/poll, state→fact mapping, energy register)
 crates/board-model       pure fake board with one profile per Phase 1 unknown
-crates/greenup-runtime   std threads: serial reader per port, actor loop, Side binding,
+crates/greenup-runtime   std threads: serial or TCP port per side, reader, actor loop,
                          persistence, RX/TX trace
-bins/legrand-sim         board-model on a socat pty
-module/RsGreenUpEvse     everestrs adapter (manifest, build.rs, main.rs)
+bins/legrand-sim         board-model behind TCP (board port + control port); socat makes
+                         a pty out of it when a program insists on a serial device
+module/RsGreenUpEvse     everestrs adapter (manifest, build.rs, main.rs, convert.rs)
 docker/  balena/  tests/traces/  tests/differential/
 ```
 - Every crate except the module builds and tests on macOS with plain cargo. The module builds only in the Linux/Docker build.

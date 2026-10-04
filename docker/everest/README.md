@@ -1,8 +1,8 @@
 # EVerest image
 
 `Dockerfile` builds upstream EVerest at a pinned SHA for arm64 (Pi 3) with the
-everestrs path enabled, and packages the result on Debian 12 slim. Later steps
-add our module in-tree and the SIL / Balena configs (docs/plan.md).
+everestrs path enabled, adds `module/RsGreenUpEvse` and the crates it uses to
+the tree, and packages the result on Debian 12 slim.
 
 ```sh
 # from the repo root; Apple silicon builds arm64 natively
@@ -21,7 +21,23 @@ to GHCR on `main`, and runs a weekly canary against EVerest `main`.
 - every ELF file under `/opt/everest` resolves its shared libraries;
 - `manager --check` accepts `config/config-spike-rust.yaml` (two Rust modules
   with a requirement between them and a C++ store), so the everestrs code
-  generation, the cxx bridge and the module install layout all work.
+  generation, the cxx bridge and the module install layout all work;
+- `manager --check` accepts `config/config-greenup-sil.yaml` and the
+  `RsGreenUpEvse` binary is installed.
+
+## How the module gets in
+
+The module directory is copied to `modules/RsGreenUpEvse` in the EVerest tree
+and `ev_add_module(RsGreenUpEvse)` is appended to `modules/CMakeLists.txt`;
+EVerest's CMake then symlinks it into the Cargo workspace it generates. The
+crates it depends on are copied to `greenup/` in the tree together with the
+root `Cargo.toml`, so their `workspace = true` keys resolve, and the module's
+relative crate paths are rewritten to that location with `sed`.
+
+The generated workspace has no lockfile, so cargo resolves every dependency
+fresh at build time. `CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS=fallback`
+makes it skip releases that need a newer rustc than `RUST_VERSION` (the first
+build without it picked `uuid` 1.27, which wants 1.89).
 
 ## Pins (build args)
 
@@ -33,7 +49,7 @@ to GHCR on `main`, and runs a weekly canary against EVerest `main`.
 | `CXXBRIDGE_VERSION` | `1.0.194` | must equal the `cxx` crate version in `lib/everest/framework/everestrs/everestrs/Cargo.toml` |
 | `CMAKE_VERSION` | `3.31.10` | see below |
 | `CXX_WARNING_FLAGS` | `-Wno-error=array-bounds ...` | see below |
-| `EVEREST_MODULES` | allowlist | only what our configs use; `RsExample*` until our module exists |
+| `EVEREST_MODULES` | allowlist | only what our configs use: the SIL set plus `RsExample*` for the spike config |
 | `EVEREST_EXCLUDE_LIBS` | ocpp, iso15118, slac, ... | see below |
 
 ## Upstream quirks worked around

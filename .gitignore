@@ -13,3 +13,9 @@ logs/
 .idea/
 .vscode/
 *.swp
+
+# EVerest module dev workspace: a symlink to the pinned EVerest checkout and
+# its own build artifacts (see module/Cargo.toml).
+module/everest-core
+module/target
+module/Cargo.lock

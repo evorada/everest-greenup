@@ -1,0 +1,62 @@
+description: EVSE manager and energy node for Legrand Green'Up wallboxes driven over the power board's serial protocol
+config:
+  port:
+    description: Serial device of this side's power board, or tcp:host:port for legrand-sim
+    type: string
+    default: /dev/ttyUSB0
+  side:
+    description: Side the board must report in its Side? answer (1 or 2); 0 disables the check
+    type: integer
+    default: 1
+  evse_id:
+    description: EVSE id reported by get_evse; must equal this module's position (from 1) in Auth's and OCPP's evse_manager connections. 0 uses the side number.
+    type: integer
+    default: 0
+  resume_from_ended:
+    description: Gate G2. After T2CNOK the board reports M; does T2COK resume charging without a replug? When false, resuming ends the transaction instead.
+    type: boolean
+    default: true
+  max_current_A:
+    description: Rated current of the Type 2 socket per phase
+    type: number
+    default: 32
+  min_current_A:
+    description: Lowest current the board charges at; below it charging pauses
+    type: number
+    default: 10
+  phase_count:
+    description: Phases wired to the Type 2 socket
+    type: integer
+    default: 3
+  nominal_voltage_V:
+    description: Nominal phase to neutral voltage, used to convert power limits to current
+    type: number
+    default: 230
+  wait_for_external_ready:
+    description: Publish ready only after external_ready_to_start_charging (true with OCPP)
+    type: boolean
+    default: false
+  domestic_socket_enabled:
+    description: Allow the Mode 2 domestic socket (2PCOK) instead of blocking it
+    type: boolean
+    default: false
+  state_dir:
+    description: Directory for persisted state (energy counter, open transaction)
+    type: string
+    default: /data/greenup
+  trace_file:
+    description: Append every serial line sent and received to this file; empty disables
+    type: string
+    default: ""
+provides:
+  evse:
+    interface: evse_manager
+    description: The EVSE manager of this side
+  energy_grid:
+    interface: energy
+    description: Energy tree leaf for this side
+metadata:
+  license: https://opensource.org/licenses/MIT
+  authors:
+    - Wojtek Siudzinski
+enable_external_mqtt: false

@@ -1,0 +1,27 @@
+# Self-contained on purpose: EVerest's generated workspace only provides the
+# everestrs dependencies, nothing else is inherited.
+[package]
+name = "RsGreenUpEvse"
+version = "0.1.0"
+edition = "2021"
+# Same floor as the host workspace; everestrs is built with Rust 1.86 upstream.
+rust-version = "1.86"
+license = "MIT OR Apache-2.0"
+description = "EVerest evse_manager and energy provider for Legrand Green'Up wallboxes"
+publish = false
+
+[dependencies]
+everestrs = { workspace = true }
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+evse-session = { path = "../../crates/evse-session" }
+greenup-runtime = { path = "../../crates/greenup-runtime" }
+legrand-driver = { path = "../../crates/legrand-driver" }
+signal-hook = "0.4"
+
+[build-dependencies]
+everestrs-build = { workspace = true }
+
+# everestrs' generated code is written for modules that declare these two
+# features (mockall-based tests); we have no such tests.
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("mockall", "trait"))'] }

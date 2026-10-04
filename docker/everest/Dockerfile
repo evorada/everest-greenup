@@ -2,8 +2,8 @@
 # EVerest for the Pi 3 (arm64) with Rust module support (docs/plan.md, "Prepare", step 3).
 #
 #   build:   upstream EVerest at a pinned SHA on the upstream build-kit image, configured
-#            with EVEREST_ENABLE_RS_SUPPORT=ON and only the modules we need.
-#            (Our own module is added in-tree in a later step.)
+#            with EVEREST_ENABLE_RS_SUPPORT=ON and only the modules we need, plus our
+#            RsGreenUpEvse module and its crates copied into the tree.
 #   runtime: Debian 12 slim (same glibc as the build-kit) with /opt/everest and our configs;
 #            the build fails if a binary misses a shared library or `manager --check` rejects
 #            the spike config.
@@ -21,7 +21,7 @@ ARG RUST_VERSION=1.86.0
 # otherwise CMake builds its own copy at configure time.
 ARG CXXBRIDGE_VERSION=1.0.194
 ARG CMAKE_VERSION=3.31.10
-ARG EVEREST_MODULES="API;Auth;DummyTokenProvider;DummyTokenValidator;EnergyManager;EnergyNode;ErrorHistory;EvseManagerSimulator;RsExample;RsExampleUser;Store"
+ARG EVEREST_MODULES="API;Auth;DummyTokenProvider;DummyTokenProviderManual;DummyTokenValidator;EnergyManager;EnergyNode;RsExample;RsExampleUser;RsGreenUpEvse;Store"
 # Libraries no module above needs. ocpp_module_common does not configure without the OCPP
 # modules (it links everest::ocpp_conversions), and the rest only cost build time.
 # Drop ocpp and ocpp_module_common from this list when OCPP201 joins EVEREST_MODULES.
@@ -72,6 +72,15 @@ RUN git init -q source \
 COPY docker/everest/patches /workspace/patches
 RUN cd source && for p in /workspace/patches/*.patch; do git apply --verbose "$p"; done
 
+# Our module goes into the tree like any other; its crates come along as a workspace of
+# their own so their `workspace = true` keys resolve. The module's relative crate paths are
+# rewritten to that location.
+COPY Cargo.toml Cargo.lock /workspace/source/greenup/
+COPY crates /workspace/source/greenup/crates
+COPY bins /workspace/source/greenup/bins
+COPY module/RsGreenUpEvse /workspace/source/modules/RsGreenUpEvse
+RUN sed -i 's#path = "../../crates/#path = "/workspace/source/greenup/crates/#'       /workspace/source/modules/RsGreenUpEvse/Cargo.toml     && echo 'ev_add_module(RsGreenUpEvse)' >> /workspace/source/modules/CMakeLists.txt
+
 RUN --mount=type=cache,target=/cache/cpm \
     --mount=type=cache,target=/cache/ccache \
     --mount=type=cache,target=/usr/local/cargo/registry \
@@ -91,6 +100,10 @@ RUN --mount=type=cache,target=/cache/cpm \
       -DBUILD_TESTING=OFF \
       2>&1 | tee /workspace/configure.log
 
+# EVerest generates the Rust workspace at configure time without a lockfile, so
+# cargo resolves every dependency fresh; the MSRV-aware fallback keeps it from
+# picking releases that need a newer rustc than RUST_VERSION (uuid 1.27 wants 1.89).
+ENV CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS=fallback
 RUN --mount=type=cache,target=/cache/cpm \
     --mount=type=cache,target=/cache/ccache \
     --mount=type=cache,target=/usr/local/cargo/registry \
@@ -124,6 +137,8 @@ RUN missing=$(find /opt/everest -type f \( -perm -u+x -o -name '*.so*' \) -exec 
       | grep 'not found' | sort -u); \
     if [ -n "$missing" ]; then echo "missing shared libraries:"; echo "$missing"; exit 1; fi
 
-RUN manager --check --config /opt/everest/etc/everest/config-spike-rust.yaml
+RUN manager --check --config /opt/everest/etc/everest/config-spike-rust.yaml \
+    && manager --check --config /opt/everest/etc/everest/config-greenup-sil.yaml \
+    && test -x /opt/everest/libexec/everest/modules/RsGreenUpEvse/RsGreenUpEvse
 
 ENTRYPOINT ["/opt/everest/bin/manager"]

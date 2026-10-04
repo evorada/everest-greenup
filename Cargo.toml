@@ -4,6 +4,7 @@
 # plain cargo (see docs/plan.md, "Repo").
 [workspace]
 resolver = "3"
+exclude = ["module"]
 members = ["crates/legrand-proto", "crates/evse-session", "crates/board-model", "crates/legrand-driver", "crates/greenup-runtime", "bins/legrand-sim"]
 
 [workspace.package]

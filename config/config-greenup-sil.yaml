@@ -1,0 +1,83 @@
+# Software in the loop: two RsGreenUpEvse instances against two legrand-sim
+# boards (docker/compose.sil.yaml), Auth with a manual token provider, the
+# energy tree with one 32 A fuse over both sides, and the API.
+#
+# The order of evse_manager connections in auth and api is the EVSE id:
+# evse_1 is EVSE 1, evse_2 is EVSE 2. Each module's `side` matches, so the
+# board's Side? answer is checked against it.
+settings:
+  telemetry_enabled: false
+active_modules:
+  evse_1:
+    module: RsGreenUpEvse
+    mapping:
+      module:
+        evse: 1
+    config_module:
+      port: tcp:sim1:5101
+      side: 1
+      state_dir: /data/greenup
+  evse_2:
+    module: RsGreenUpEvse
+    mapping:
+      module:
+        evse: 2
+    config_module:
+      port: tcp:sim2:5101
+      side: 2
+      state_dir: /data/greenup
+  auth:
+    module: Auth
+    config_module:
+      connection_timeout: 60
+      selection_algorithm: PlugEvents
+      prioritize_authorization_over_stopping_transaction: true
+    connections:
+      token_provider:
+        - module_id: token_provider
+          implementation_id: main
+      token_validator:
+        - module_id: token_validator
+          implementation_id: main
+      evse_manager:
+        - module_id: evse_1
+          implementation_id: evse
+        - module_id: evse_2
+          implementation_id: evse
+  token_provider:
+    module: DummyTokenProviderManual
+    config_implementation:
+      main:
+        mqtt_topic: everest_api/dummy_token_provider/cmd/provide
+  token_validator:
+    module: DummyTokenValidator
+    config_implementation:
+      main:
+        validation_result: Accepted
+        validation_reason: Token seems valid
+        sleep: 0.25
+  energy_manager:
+    module: EnergyManager
+    connections:
+      energy_trunk:
+        - module_id: grid_connection_point
+          implementation_id: energy_grid
+  grid_connection_point:
+    module: EnergyNode
+    config_module:
+      fuse_limit_A: 32.0
+      phase_count: 3
+    connections:
+      energy_consumer:
+        - module_id: evse_1
+          implementation_id: energy_grid
+        - module_id: evse_2
+          implementation_id: energy_grid
+  api:
+    module: API
+    connections:
+      evse_manager:
+        - module_id: evse_1
+          implementation_id: evse
+        - module_id: evse_2
+          implementation_id: evse

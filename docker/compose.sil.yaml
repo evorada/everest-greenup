@@ -1,0 +1,58 @@
+# Software-in-the-loop on a Mac: EVerest with two RsGreenUpEvse instances
+# against two simulated boards, mosquitto in between.
+#
+#   docker compose -f docker/compose.sil.yaml up --build
+#   echo plug | nc localhost 5102      # side 1: vehicle plugs in
+#   echo draw | nc localhost 5102      # ... and draws power
+#   echo unplug | nc localhost 5102
+#   (side 2 listens on 5202)
+#
+# Authorize through the manual token provider:
+#   mosquitto_pub -h localhost -t everest_api/dummy_token_provider/cmd/provide \
+#     -m '{"id_token":{"value":"DEADBEEF","type":"ISO14443"},"authorization_type":"RFID"}'
+# and watch the events:
+#   mosquitto_sub -h localhost -t 'everest/#' -v | grep session_event
+#
+# `docker stats` while a session runs stands in for the Pi 3's memory gate.
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    ports:
+      - "1883:1883"
+
+  sim1:
+    build:
+      context: ..
+      dockerfile: docker/sim/Dockerfile
+    command: ["--board", "0.0.0.0:5101", "--control", "0.0.0.0:5102", "--side", "1"]
+    ports:
+      - "5102:5102"
+
+  sim2:
+    build:
+      context: ..
+      dockerfile: docker/sim/Dockerfile
+    command: ["--board", "0.0.0.0:5101", "--control", "0.0.0.0:5102", "--side", "2"]
+    ports:
+      - "5202:5102"
+
+  everest:
+    build:
+      context: ..
+      dockerfile: docker/everest/Dockerfile
+    depends_on:
+      - mosquitto
+      - sim1
+      - sim2
+    environment:
+      MQTT_SERVER_ADDRESS: mosquitto
+      MQTT_SERVER_PORT: "1883"
+    command: ["--config", "/opt/everest/etc/everest/config-greenup-sil.yaml"]
+    volumes:
+      - data:/data
+
+volumes:
+  data: {}

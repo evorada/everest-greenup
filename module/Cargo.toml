@@ -1,0 +1,19 @@
+# Development workspace for the EVerest module, so it type-checks on the
+# host. It is NOT part of the root workspace (which excludes `module/`):
+# in the image, EVerest's CMake generates its own Cargo workspace around
+# the module directory. To use it:
+#
+#   ln -s /path/to/everest-core module/everest-core   # the pinned checkout
+#   EVEREST_CORE_ROOT=$PWD/module/everest-core cargo check --manifest-path module/Cargo.toml
+#
+# `build_bazel` makes everestrs skip the C++ link step; nothing links here.
+[workspace]
+resolver = "2"
+members = ["RsGreenUpEvse"]
+
+[workspace.dependencies]
+everestrs = { path = "everest-core/lib/everest/framework/everestrs/everestrs", features = ["build_bazel"] }
+everestrs-build = { path = "everest-core/lib/everest/framework/everestrs/everestrs-build" }
+# everestrs sits under this directory through the symlink, so cargo resolves
+# its `workspace = true` dependencies against this file.
+everestrs-derive = { path = "everest-core/lib/everest/framework/everestrs/everestrs-derive" }
