@@ -4,7 +4,7 @@
 # plain cargo (see docs/plan.md, "Repo").
 [workspace]
 resolver = "3"
-members = ["crates/legrand-proto", "crates/evse-session", "crates/board-model", "crates/legrand-driver"]
+members = ["crates/legrand-proto", "crates/evse-session", "crates/board-model", "crates/legrand-driver", "crates/greenup-runtime", "bins/legrand-sim"]
 
 [workspace.package]
 version = "0.1.0"
@@ -20,6 +20,8 @@ legrand-proto = { path = "crates/legrand-proto" }
 evse-session = { path = "crates/evse-session" }
 board-model = { path = "crates/board-model" }
 legrand-driver = { path = "crates/legrand-driver" }
+greenup-runtime = { path = "crates/greenup-runtime" }
+legrand-sim = { path = "bins/legrand-sim" }
 
 [workspace.lints.clippy]
 unwrap_used = "deny"
