@@ -1,0 +1,19 @@
+[package]
+name = "legrand-driver"
+description = "ChargerDriver for the Legrand Green'Up power board: handshake, polling, command scheduling, state to fact mapping, energy register (pure, no I/O)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+evse-session = { workspace = true }
+legrand-proto = { workspace = true }
+
+[dev-dependencies]
+board-model = { workspace = true }
+
+[lints]
+workspace = true

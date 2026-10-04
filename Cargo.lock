@@ -137,6 +137,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "legrand-driver"
+version = "0.1.0"
+dependencies = [
+ "board-model",
+ "evse-session",
+ "legrand-proto",
+]
+
+[[package]]
 name = "legrand-proto"
 version = "0.1.0"
 
