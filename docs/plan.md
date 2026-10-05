@@ -75,7 +75,7 @@ module/RsGreenUpEvse     everestrs adapter (manifest, build.rs, main.rs, convert
 docker/  balena/  tests/traces/  tests/differential/
 ```
 - Every crate except the module builds and tests on macOS with plain cargo. The module builds only in the Linux/Docker build.
-- greenup-link code is copied with its MIT notice: `src/serial.rs:10-235` (loop, handshake, ping, parser, FM, energy), `src/index.html:491-573` (letters), `src/api.rs` (command strings). License the new crates MIT OR Apache-2.0.
+- greenup-link code is copied with its MIT notice: `src/serial.rs:10-235` (loop, handshake, ping, parser, FM, energy), `src/index.html:491-573` (letters), `src/api.rs` (command strings). License the new crates MIT.
 
 ### everestrs facts
 - Bindings: `lib/everest/framework/everestrs` v0.26 (cxx, not on crates.io). Flag `-DEVEREST_ENABLE_RS_SUPPORT=ON`; the module directory must start with `Rs`; add `ev_add_module(...)`. Rust ≥ 1.86.

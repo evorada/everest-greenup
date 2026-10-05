@@ -12,7 +12,7 @@ version = "0.1.0"
 edition = "2024"
 # everestrs is built with Rust 1.86 upstream (Bazel pin); stay compatible.
 rust-version = "1.86"
-license = "MIT OR Apache-2.0"
+license = "MIT"
 authors = ["Wojtek Siudzinski"]
 repository = "https://github.com/evorada/everest-greenup"
 

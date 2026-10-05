@@ -6,7 +6,7 @@ version = "0.1.0"
 edition = "2021"
 # Same floor as the host workspace; everestrs is built with Rust 1.86 upstream.
 rust-version = "1.86"
-license = "MIT OR Apache-2.0"
+license = "MIT"
 description = "EVerest evse_manager and energy provider for Legrand Green'Up wallboxes"
 publish = false
 

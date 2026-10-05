@@ -76,5 +76,5 @@ events.
 
 ## License
 
-MIT OR Apache-2.0, at your option. Parts are derived from
+MIT, see `LICENSE`. Parts are derived from
 [greenup-link](https://github.com/BolzaW/greenup-link) (MIT); see `NOTICE`.
