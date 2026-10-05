@@ -16,7 +16,9 @@
 //! representation here, so nothing built on this crate can send them.
 //!
 //! Protocol knowledge comes from greenup-link (MIT, see `NOTICE`) and its
-//! reverse-engineered `docs/PROTOCOLE_SERIE_LEGRAND.md`. Meanings marked
+//! reverse-engineered `docs/PROTOCOLE_SERIE_LEGRAND.md`; the functioning
+//! modes ([`FunctioningMode`], `FM2` eco-start) come from BolzaW's reading
+//! of the ATmega firmware (greenup-link issue #9). Meanings marked
 //! *unverified* still need confirming on hardware (`docs/plan.md`, Phase 1).
 
 mod command;
@@ -24,7 +26,7 @@ mod framer;
 mod message;
 mod state;
 
-pub use command::{Command, Current, CurrentOutOfRange, FmMode, Query};
+pub use command::{Command, Current, CurrentOutOfRange, FunctioningMode, Query};
 pub use framer::LineFramer;
 pub use message::{ErrorCode, Message, Plug, SessionReport};
 pub use state::StateCode;

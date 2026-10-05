@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use std::time::Duration;
 
-use crate::StateCode;
+use crate::{FunctioningMode, StateCode};
 
 /// Error code from `E:xxxx`. `0000` means no error; the meaning of other
 /// codes is *unverified*.
@@ -126,8 +126,13 @@ pub enum Message {
     /// `FCS:…`, "charge complete" (vehicle stopped drawing); payload
     /// *unverified*.
     ChargeComplete(String),
-    /// `FM:…`, see [`crate::FmMode`]. Seen values: `1`, `1F`.
-    FmMode(String),
+    /// `FM:n`, the board's functioning mode. Unknown numbers (and the
+    /// `1F` greenup-link once guarded against, which the board never
+    /// sends) are [`Message::Malformed`].
+    FunctioningMode(FunctioningMode),
+    /// `FM2:0|1`, eco-start off/on (reply format *unverified*: the
+    /// protocol doc lists the query, not the answer).
+    EcoStart(bool),
     /// `BT:0|1`, Bluetooth module off/on.
     Bluetooth(bool),
     /// `Slp:0|1`, deep sleep off/on.
@@ -178,7 +183,12 @@ impl Message {
             "Freq" => real("Freq", value, Message::Frequency),
             "Ener" => real("Ener", value, Message::Energy),
             "FCS" => Message::ChargeComplete(value.to_owned()),
-            "FM" => text("FM", value, Message::FmMode),
+            "FM" => value
+                .parse()
+                .ok()
+                .and_then(FunctioningMode::from_number)
+                .map_or_else(|| malformed("FM", value), Message::FunctioningMode),
+            "FM2" => flag("FM2", value, Message::EcoStart),
             "BT" => flag("BT", value, Message::Bluetooth),
             "Slp" => flag("Slp", value, Message::Sleep),
             "TICTestB" => number("TICTestB", value, Message::TicTestBaud),

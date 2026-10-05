@@ -37,6 +37,9 @@ pub struct Profile {
     pub telemetry_interval: Duration,
     /// The functioning mode the board boots with (`FM?`).
     pub native_fm: u8,
+    /// Eco-start (`FM2?`, DIP switch 2) on at boot: the board then withholds
+    /// charging until off-peak hours.
+    pub native_eco_start: bool,
     /// Grid voltage reported.
     pub voltage: f32,
 }
@@ -54,6 +57,7 @@ impl Default for Profile {
             ends_session_when_full: true,
             telemetry_interval: Duration::from_secs(1),
             native_fm: 1,
+            native_eco_start: false,
             voltage: 230.0,
         }
     }
@@ -106,6 +110,13 @@ impl Profile {
                     ..Profile::default()
                 },
             ),
+            (
+                "eco-start",
+                Profile {
+                    native_eco_start: true,
+                    ..Profile::default()
+                },
+            ),
         ]
     }
 }
@@ -128,6 +139,7 @@ pub struct Board {
     domestic_allowed: bool,
     cc: u8,
     fm: u8,
+    eco_start: bool,
     bt: bool,
     sleeping: bool,
     ended: bool,
@@ -151,6 +163,7 @@ impl Board {
     pub fn new(profile: Profile, now: Instant) -> Self {
         Board {
             fm: profile.native_fm,
+            eco_start: profile.native_eco_start,
             profile,
             ev: Ev::Absent,
             t2_allowed: false,
@@ -215,6 +228,11 @@ impl Board {
     /// Current functioning mode.
     pub fn fm(&self) -> u8 {
         self.fm
+    }
+
+    /// Eco-start on: no charging outside off-peak hours.
+    pub fn eco_start(&self) -> bool {
+        self.eco_start
     }
 
     /// Bluetooth module on.
@@ -316,6 +334,15 @@ impl Board {
             "CC?" => out.push(format!("CC:{}", self.cc)),
             "CCTIC?" => out.push("CCTIC:32".to_owned()),
             "FM?" => out.push(format!("FM:{}", self.fm)),
+            "FM2?" => out.push(format!("FM2:{}", u8::from(self.eco_start))),
+            "FM2:0" => {
+                self.eco_start = false;
+                out.push("FM2:0".to_owned());
+            }
+            "FM2:1" => {
+                self.eco_start = true;
+                out.push("FM2:1".to_owned());
+            }
             "BT?" => out.push(format!("BT:{}", u8::from(self.bt))),
             "BTOK" => {
                 self.bt = true;

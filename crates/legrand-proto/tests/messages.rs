@@ -4,7 +4,7 @@
 
 use std::time::Duration;
 
-use legrand_proto::{Message, Plug, SessionReport, StateCode};
+use legrand_proto::{FunctioningMode, Message, Plug, SessionReport, StateCode};
 
 fn malformed(key: &'static str, value: &str) -> Message {
     Message::Malformed {
@@ -114,8 +114,26 @@ fn flags_accept_only_0_and_1() {
 }
 
 #[test]
+fn functioning_modes() {
+    assert_eq!(
+        Message::parse("FM:1"),
+        Message::FunctioningMode(FunctioningMode::DirectCharge)
+    );
+    assert_eq!(
+        Message::parse("FM:6"),
+        Message::FunctioningMode(FunctioningMode::Ocpp)
+    );
+    // The board never sends 1F; greenup-link's old guard was a guess.
+    assert_eq!(Message::parse("FM:1F"), malformed("FM", "1F"));
+    assert_eq!(Message::parse("FM:7"), malformed("FM", "7"));
+    assert_eq!(Message::parse("FM:"), malformed("FM", ""));
+    assert_eq!(Message::parse("FM2:0"), Message::EcoStart(false));
+    assert_eq!(Message::parse("FM2:1"), Message::EcoStart(true));
+    assert_eq!(Message::parse("FM2:2"), malformed("FM2", "2"));
+}
+
+#[test]
 fn modes_and_reports() {
-    assert_eq!(Message::parse("FM:1F"), Message::FmMode("1F".into()));
     assert_eq!(
         Message::parse("FCS:"),
         Message::ChargeComplete(String::new())

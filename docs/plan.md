@@ -9,7 +9,7 @@
   - native `everestrs` module compiled into a custom EVerest build;
   - a new repo in the `evorada` org;
   - a Balena release (`raspberrypi3-64`) as the artifact.
-- Related: issue on `FM` https://github.com/BolzaW/greenup-link/issues/9. Local EVerest checkout for reference: `/Users/suda/Projects/ModDefOrg/EVerest` (fd2a058e).
+- Related: https://github.com/BolzaW/greenup-link/issues/9. BolzaW answered on 2026-10-02 (FM meaning, see hazards), offered the original Legrand SD image and the v01.18.04 installation kit, and intends to split greenup-link into a small standalone daemon plus an EVerest driver for these boards. Coordinate: `legrand-proto` and `legrand-driver` are the shared pieces, and the 058049 is the test hardware. Local EVerest checkout for reference: `/Users/suda/Projects/ModDefOrg/EVerest` (fd2a058e).
 
 ## Why not a BSP under EvseManager
 
@@ -34,7 +34,8 @@ The two costs we accept: the interface churns more (pin the version, upgrade del
 - `Z\r` puts the board into its bootloader (upstream `src/flash.rs:521-531`). `Reset` and `Test` are dangerous too. The `Command` enum has no variant for any of them and there is no raw passthrough.
 - Opening the port might reset the MCU through DTR (it is flashed with `avrdude -cwiring`). Gate G6 checks it; `stty -hupcl` if needed.
 - Always answer `RaspberryPi?` with `RaspberryPiModeOK`. What the board does when the answers stop is gate G5.
-- `FM` is forced to `1` (greenup-link `src/serial.rs:161-166`) and is undocumented. Record the native value first.
+- `FM` is the board's functioning mode (BolzaW, from the ATmega 18.04 bytecode, issue #9): `1` direct charge (charges as soon as a car is plugged in, no internal logic), `2` remote controls / auto-heures (dry contact or TIC off-peak flags), `3` TIC Linky (not implemented), `4` planning (internal calendar), `5` Modbus DLM, `6` OCPP (changes the board's state machine: no TIC detection, blocking 30 s RFID wait, different `Unlock`). greenup-link forces `FM:1`; BolzaW confirms this is safe on the 058049 (same firmware family, `Voltage:3P+N` and `Side:` in the bytecode). The board never sends `1F`.
+- `FM2` is eco-start: with `FM2:1` (same as DIP switch 2 on) the board withholds charging until the TIC flags say off-peak, which the Pi cannot observe. We force `FM2:0`. Record the native `FM` and `FM2` values first anyway, to restore them if the board ever goes back to Legrand's software.
 
 ## Architecture
 
@@ -132,7 +133,7 @@ Raise `evse_manager/Inoperative` (message carries the Legrand detail) for:
 - board fault letters;
 - `E:xxxx` ≠ 0000;
 - link down for more than 3 s;
-- FM that won't stick;
+- `FM:1` or `FM2:0` that won't stick;
 - unauthorized charging;
 - `T2CNOK` ignored for 10 s.
 
@@ -165,7 +166,7 @@ Clear it when the condition is gone. Auth and OCPP derive "Faulted" from this er
 | F G H R S T U V | fault |
 
   `FCS:` and `WT:…` reports go to the session as hints. The session core decides the events.
-- On (re)connect the driver sends `RaspberryPiModeOK`, `BTNOK`, `2PCNOK` (domestic socket disabled, configurable), `Side?`, `FM?` (then `FM:1`), `State?`, `CC?`, `E?`. After that it polls `State?` every 5 s and `E?`/`CC?`/`FM?`/`BT?` every 60 s.
+- On (re)connect the driver sends `RaspberryPiModeOK`, `BTNOK`, `2PCNOK` (domestic socket disabled, configurable), `Side?`, `FM?` (then `FM:1`), `FM2?` (then `FM2:0`), `State?`, `CC?`, `E?`. After that it polls `State?` every 5 s and `E?`/`CC?`/`FM?`/`FM2?`/`BT?` every 60 s.
 - The scheduler is state-based (wanted / last sent / reported): at most one command per 150 ms, ping reply first, `CC` before `T2COK`.
 - Unauthorized charging (the board delivers while the session didn't authorize) gets `T2CNOK` every 2 s plus Inoperative.
 - When the board is already mid-charge at startup, send `T2CNOK` and start a fresh session (re-authorization needed). Any transaction we persisted gets closed the way EvseManager's `cleanup_transactions_on_startup` (`Charger.cpp:1577`) does it.
@@ -175,7 +176,7 @@ Clear it when the condition is gone. Auth and OCPP derive "Faulted" from this er
 
 ### Prepare
 1. Desk, 1-2 h.
-   - Ask BolzaW (issue #9) for the Java state and error tables and the meaning of FM.
+   - FM is answered (issue #9). Still open: the Java state and error tables and the ping timeout. Accept BolzaW's offer of the original SD image and the v01.18.04 kit; their `.jar` is where those tables live.
    - Get a Type 2 EV simulator (CP B/C/D switch, diode fault).
    - Pin upstream `main` at a fixed SHA and move to `2026.10.0` once it's tagged. `2026.02.1` predates many evse_manager changes.
 2. Hardware discovery on Balena, 2-3 sessions (8-12 h).
@@ -186,7 +187,7 @@ Clear it when the condition is gone. Auth and OCPP derive "Faulted" from this er
 
 | Gate | Experiment | Go | If it fails |
 | --- | --- | --- | --- |
-| G1 | `FM:1` + `BTNOK` + `2PCNOK`; plug in; 5 min with no `T2COK` | stays B, no PWM | **No-go** for auth/OCPP: only metering + static `CC` are possible |
+| G1 | `FM:1` + `FM2:0` + `BTNOK` + `2PCNOK`; plug in; 5 min with no `T2COK` | stays B, no PWM | **No-go** for auth/OCPP: only metering + static `CC` are possible |
 | G2 | `T2CNOK` mid-charge, then `T2COK` while still plugged | stops ≤ 3 s, resumes | `resume_charging` returns false; an energy pause becomes stop + replug |
 | G4 | `CC` 6..32 idle and mid-charge; power-cycle, then `CC?` | applied ≤ 5 s; minimum known | no load sharing (static CC); if CC lands in EEPROM, slow updates down |
 | G5 | stop answering pings (idle, C, charging) | board stops; time recorded | document it; the SIGTERM `T2CNOK` covers clean shutdowns |
@@ -222,7 +223,7 @@ Clear it when the condition is gone. Auth and OCPP derive "Faulted" from this er
 - Linky headroom via `external_energy_limits_consumer_API`.
 - Domestic socket.
 - More `ChargerDriver`s (other wallboxes).
-- Offer the protocol crate to greenup-link.
+- Share `legrand-proto` and `legrand-driver` with greenup-link (BolzaW plans the same split; see Context).
 
 ## Verification
 

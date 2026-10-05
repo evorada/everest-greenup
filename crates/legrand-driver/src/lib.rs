@@ -7,14 +7,15 @@
 //! What it does, per `docs/plan.md` ("Board side"):
 //!
 //! - on (re)connect: `RaspberryPiModeOK`, `BTNOK`, `2PCNOK` (or `2PCOK`),
-//!   `Side?`, `FM?` (forcing `FM:1`), `State?`, `CC?`, `E?`, then `T2CNOK`
-//!   so a board found mid-charge starts a fresh session;
-//! - polling: `State?` every 5 s, `E?`/`CC?`/`FM?`/`BT?` every 60 s;
+//!   `Side?`, `FM?` (forcing `FM:1`, direct charge), `FM2?` (forcing
+//!   `FM2:0`, no eco-start), `State?`, `CC?`, `E?`, then `T2CNOK` so a
+//!   board found mid-charge starts a fresh session;
+//! - polling: `State?` every 5 s, `E?`/`CC?`/`FM?`/`FM2?`/`BT?` every 60 s;
 //! - scheduling: one command per 150 ms, ping replies first, `CC` before
 //!   `T2COK`, no duplicates in the queue;
 //! - facts: the board's state letters mapped to [`Fact`]s;
 //! - faults: link down for 3 s, side mismatch, board fault letters,
-//!   `E:xxxx`, `FM:1` that will not stick, `T2CNOK` ignored for 10 s,
+//!   `E:xxxx`, `FM:1` or `FM2:0` that will not stick, `T2CNOK` ignored for 10 s,
 //!   delivery without authorization (which also gets `T2CNOK` every 2 s);
 //! - metering: `Volt`/`CCI`/`Freq` into a power figure and a monotonic
 //!   energy register integrated while delivering (provisional until gate
@@ -24,7 +25,7 @@ use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
 use evse_session::{ChargerDriver, DriverAction, DriverEvent, Fact, Hint, MeterSnapshot, Poll};
-use legrand_proto::{Command, Current, FmMode, Message, Query, StateCode};
+use legrand_proto::{Command, Current, FunctioningMode, Message, Query, StateCode};
 
 /// Tunables; the defaults are the plan's numbers.
 #[derive(Debug, Clone, PartialEq)]
@@ -67,7 +68,7 @@ impl Default for DriverConfig {
     }
 }
 
-/// How many `FM:1` orders go unheeded before it is a fault.
+/// How many `FM:1` (or `FM2:0`) orders go unheeded before it is a fault.
 const FM_ATTEMPTS: u8 = 3;
 
 #[derive(Debug, Clone, Default)]
@@ -77,6 +78,7 @@ struct Faults {
     board_fault: Option<char>,
     error_code: Option<String>,
     fm_stuck: bool,
+    eco_start_stuck: bool,
     block_ignored: bool,
     unauthorized: bool,
 }
@@ -99,6 +101,9 @@ impl Faults {
         }
         if self.fm_stuck {
             return Some("board refuses FM:1 (direct charge mode)".to_owned());
+        }
+        if self.eco_start_stuck {
+            return Some("board refuses FM2:0 (eco-start stays on)".to_owned());
         }
         if self.block_ignored {
             return Some("board keeps delivering after T2CNOK".to_owned());
@@ -136,6 +141,7 @@ pub struct LegrandDriver {
     state: Option<StateCode>,
     reported_cc: Option<u8>,
     fm_attempts: u8,
+    eco_start_attempts: u8,
     last_fact: Option<Fact>,
     faults: Faults,
     last_fault: Option<String>,
@@ -162,6 +168,7 @@ impl LegrandDriver {
             state: None,
             reported_cc: None,
             fm_attempts: 0,
+            eco_start_attempts: 0,
             last_fact: None,
             faults: Faults::default(),
             last_fault: None,
@@ -291,6 +298,7 @@ impl ChargerDriver for LegrandDriver {
         self.sent_authorized = None;
         self.reported_cc = None;
         self.fm_attempts = 0;
+        self.eco_start_attempts = 0;
         self.faults.link_down = false;
         self.queue.clear();
         for cmd in [
@@ -298,7 +306,8 @@ impl ChargerDriver for LegrandDriver {
             Command::Bluetooth(false),
             Command::DomesticCharging(self.cfg.domestic_socket),
             Command::Query(Query::Side),
-            Command::Query(Query::FmMode),
+            Command::Query(Query::FunctioningMode),
+            Command::Query(Query::EcoStart),
             Command::Query(Query::State),
             Command::Query(Query::CurrentLimit),
             Command::Query(Query::Error),
@@ -336,16 +345,28 @@ impl ChargerDriver for LegrandDriver {
                 };
             }
             Message::CurrentLimit(amps) => self.reported_cc = Some(amps),
-            Message::FmMode(mode) => {
-                if mode == "1" {
+            Message::FunctioningMode(mode) => {
+                if mode == FunctioningMode::DirectCharge {
                     self.fm_attempts = 0;
                     self.faults.fm_stuck = false;
                 } else if self.fm_attempts >= FM_ATTEMPTS {
                     self.faults.fm_stuck = true;
                 } else {
                     self.fm_attempts += 1;
-                    self.enqueue(Command::SetFmMode(FmMode::One));
-                    self.enqueue(Command::Query(Query::FmMode));
+                    self.enqueue(Command::SetFunctioningMode(FunctioningMode::DirectCharge));
+                    self.enqueue(Command::Query(Query::FunctioningMode));
+                }
+            }
+            Message::EcoStart(on) => {
+                if !on {
+                    self.eco_start_attempts = 0;
+                    self.faults.eco_start_stuck = false;
+                } else if self.eco_start_attempts >= FM_ATTEMPTS {
+                    self.faults.eco_start_stuck = true;
+                } else {
+                    self.eco_start_attempts += 1;
+                    self.enqueue(Command::EcoStart(false));
+                    self.enqueue(Command::Query(Query::EcoStart));
                 }
             }
             Message::Side(side) => {
@@ -436,7 +457,8 @@ impl ChargerDriver for LegrandDriver {
             for q in [
                 Query::Error,
                 Query::CurrentLimit,
-                Query::FmMode,
+                Query::FunctioningMode,
+                Query::EcoStart,
                 Query::Bluetooth,
             ] {
                 self.enqueue(Command::Query(q));

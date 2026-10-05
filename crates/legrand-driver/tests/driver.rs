@@ -82,13 +82,14 @@ fn handshake_order_and_pacing() {
     let mut rig = Rig::new(Profile::default(), DriverConfig::default());
     rig.run(Duration::from_secs(2));
     assert_eq!(
-        rig.sent[..9],
+        rig.sent[..10],
         [
             "RaspberryPiModeOK",
             "BTNOK",
             "2PCNOK",
             "Side?",
             "FM?",
+            "FM2?",
             "State?",
             "CC?",
             "E?",
@@ -98,7 +99,7 @@ fn handshake_order_and_pacing() {
     assert!(!rig.board.bluetooth());
     assert_eq!(rig.facts(), [Fact::Unplugged]);
     assert!(rig.faults().is_empty(), "{:?}", rig.faults());
-    // Nine commands in the first 1.35 s at 150 ms spacing, no faster.
+    // At 150 ms spacing no more than seven commands fit in the first second.
     let mut rig = Rig::new(Profile::default(), DriverConfig::default());
     rig.run(Duration::from_millis(1000));
     assert!(rig.sent.len() <= 7, "{:?}", rig.sent);
@@ -169,6 +170,34 @@ fn native_mode_is_forced_to_direct_charge() {
     assert_eq!(rig.board.fm(), 1);
     assert!(rig.sent.iter().any(|c| c == "FM:1"));
     assert!(rig.faults().is_empty());
+}
+
+#[test]
+fn eco_start_is_switched_off_and_a_stuck_one_is_a_fault() {
+    let mut rig = Rig::new(
+        Profile {
+            native_eco_start: true,
+            ..Profile::default()
+        },
+        DriverConfig::default(),
+    );
+    rig.run(Duration::from_secs(3));
+    assert!(!rig.board.eco_start());
+    assert!(rig.sent.iter().any(|c| c == "FM2:0"));
+    assert!(rig.faults().is_empty());
+    let mut driver = LegrandDriver::new(DriverConfig::default());
+    let t0 = Instant::now();
+    driver.connected(t0);
+    let mut faults = Vec::new();
+    for i in 0..6 {
+        let events = driver.on_line("FM2:1", t0 + Duration::from_secs(i));
+        faults.extend(
+            events
+                .into_iter()
+                .filter(|e| matches!(e, DriverEvent::Fault(_))),
+        );
+    }
+    assert!(matches!(faults.as_slice(), [DriverEvent::Fault(Some(m))] if m.contains("FM2:0")));
 }
 
 #[test]
@@ -283,6 +312,7 @@ fn state_is_polled_every_five_seconds_and_the_rest_every_minute() {
     let count = |cmd: &str| rig.sent.iter().filter(|c| c.as_str() == cmd).count();
     assert!((11..=14).contains(&count("State?")), "{}", count("State?"));
     assert_eq!(count("E?"), 2);
+    assert_eq!(count("FM2?"), 2);
     assert_eq!(count("BT?"), 1);
 }
 
